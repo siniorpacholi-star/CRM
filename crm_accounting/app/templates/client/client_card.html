@@ -1,0 +1,638 @@
+<!-- app/templates/client/client_card.html -->
+{% extends "client_base.html" %}
+
+{% block title %}{{ client_db.organization_name }} - CRM Бухгалтерия{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-0">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2"><i class="fas fa-user me-2"></i>Карточка клиента: {{ client_db.organization_name }}</h1>
+        <div>
+            <a href="/client/{{ client.id }}/clients" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-arrow-left me-2"></i>Назад к списку
+            </a>
+            <button class="btn btn-outline-danger" onclick="deleteClient({{ client_db.id }})">
+                <i class="fas fa-trash me-2"></i>Удалить
+            </button>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Левая колонка - Общая информация -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0"><i class="fas fa-info-circle me-2"></i>Общая информация</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Наименование организации</strong></label>
+                        <p class="form-control-plaintext">{{ client_db.organization_name }}</p>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label"><strong>Организационно-правовая форма</strong></label>
+                                <p class="form-control-plaintext">{{ client_db.legal_form }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label"><strong>Система налогообложения</strong></label>
+                                <p class="form-control-plaintext">{{ client_db.tax_system }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label"><strong>ИНН</strong></label>
+                                <p class="form-control-plaintext">{{ client_db.inn or 'Не указан' }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label"><strong>ОГРН</strong></label>
+                                <p class="form-control-plaintext">{{ client_db.ogrn or 'Не указан' }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Работодатель</strong></label>
+                        <p class="form-control-plaintext">
+                            {% if client_db.is_employer %}
+                                <span class="badge bg-success">Да</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Нет</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label"><strong>Дата создания</strong></label>
+                                <p class="form-control-plaintext">{{ client_db.created_at.strftime('%d.%m.%Y %H:%M') }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label"><strong>Последнее обновление</strong></label>
+                                <p class="form-control-plaintext">{{ client_db.updated_at.strftime('%d.%m.%Y %H:%M') }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Правая колонка - ЭЦП -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0"><i class="fas fa-certificate me-2"></i>ЭЦП</h5>
+                    <button class="btn btn-primary-custom btn-sm" data-bs-toggle="modal" data-bs-target="#addSignatureModal">
+                        <i class="fas fa-plus me-1"></i>Добавить ЭЦП
+                    </button>
+                </div>
+                <div class="card-body">
+                    {% if signatures %}
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Начало действия</th>
+                                    <th>Окончание действия</th>
+                                    <th>Статус</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for signature in signatures %}
+                                {% set days_left = (signature.end_date - today).days %}
+                                <tr class="{% if days_left < 0 %}table-danger{% elif days_left < 10 %}table-warning{% endif %}">
+                                    <td>{{ signature.start_date.strftime('%d.%m.%Y') }}</td>
+                                    <td>{{ signature.end_date.strftime('%d.%m.%Y') }}</td>
+                                    <td>
+                                        {% if days_left < 0 %}
+                                            <span class="badge bg-danger">Просрочена</span>
+                                        {% elif days_left < 5 %}
+                                            <span class="badge bg-warning">Скоро истекает ({{ days_left }} дн.)</span>
+                                        {% elif days_left < 10 %}
+                                            <span class="badge bg-info">Истекает ({{ days_left }} дн.)</span>
+                                        {% else %}
+                                            <span class="badge bg-success">Действует ({{ days_left }} дн.)</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-danger" 
+                                                onclick="deleteSignature({{ signature.id }})">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-certificate fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">ЭЦП не добавлены</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Нижняя часть - Отчеты клиента -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0"><i class="fas fa-file-alt me-2"></i>Отчеты клиента</h5>
+                    <button class="btn btn-primary-custom btn-sm" data-bs-toggle="modal" data-bs-target="#addReportModal">
+                        <i class="fas fa-plus me-1"></i>Добавить отчет
+                    </button>
+                </div>
+                <div class="card-body">
+                    {% if client_reports_with_history %}
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Отчет</th>
+                                    <th>История периодов</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in client_reports_with_history %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ item.report.short_name }}</strong>
+                                        <br><small class="text-muted">{{ item.report.full_name }}</small>
+                                    </td>
+                                    <td>
+                                        {% if item.history %}
+                                        <div class="small">
+                                            {% for history in item.history %}
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <span>
+                                                    {{ history.start_date.strftime('%d.%m.%Y') }} 
+                                                    {% if history.end_date %}
+                                                    - {{ history.end_date.strftime('%d.%m.%Y') }}
+                                                    {% else %}
+                                                    - настоящее время
+                                                    {% endif %}
+                                                </span>
+                                                <div class="btn-group btn-group-sm">
+                                                    <button class="btn btn-outline-primary btn-sm" 
+                                                            onclick="editReportHistory({{ history.id }}, '{{ history.start_date.strftime('%Y-%m-%d') }}', '{{ history.end_date.strftime('%Y-%m-%d') if history.end_date else '' }}')"
+                                                            title="Редактировать период">
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                    <button class="btn btn-outline-danger btn-sm" 
+                                                            onclick="deleteReportHistory({{ history.id }})"
+                                                            title="Удалить период">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        {% else %}
+                                        <span class="text-muted">Нет истории</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary me-1" 
+                                                    onclick="addReportHistory({{ item.client_report.id }})"
+                                                    title="Добавить период">
+                                                <i class="fas fa-plus"></i>
+                                            </button>
+                                            <button class="btn btn-outline-danger" 
+                                                    onclick="removeClientReport({{ item.client_report.id }})"
+                                                    title="Удалить отчет">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">Отчеты не добавлены</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно добавления ЭЦП -->
+<div class="modal fade" id="addSignatureModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Добавить ЭЦП для {{ client_db.organization_name }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addSignatureForm">
+                    <input type="hidden" name="client_id" value="{{ client_db.id }}">
+                    <div class="mb-3">
+                        <label class="form-label">Дата начала *</label>
+                        <input type="date" class="form-control" name="start_date" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Дата окончания *</label>
+                        <input type="date" class="form-control" name="end_date" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary-custom" onclick="createDigitalSignature()">Добавить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно добавления отчета -->
+<div class="modal fade" id="addReportModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Добавить отчет для {{ client_db.organization_name }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addReportToClientForm">
+                    <div class="mb-3">
+                        <label class="form-label">Выберите отчет *</label>
+                        <select class="form-control" name="report_id" required>
+                            <option value="">Выберите отчет</option>
+                            {% for report in available_reports %}
+                            <option value="{{ report.id }}">{{ report.short_name }} - {{ report.full_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary-custom" onclick="addReportToClient()">Добавить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно добавления истории отчета -->
+<div class="modal fade" id="addHistoryModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Добавить период для отчета</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addHistoryForm">
+                    <input type="hidden" id="clientReportId" name="client_report_id">
+                    <div class="mb-3">
+                        <label class="form-label">Дата начала *</label>
+                        <input type="date" class="form-control" name="start_date" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Дата окончания</label>
+                        <input type="date" class="form-control" name="end_date">
+                        <div class="form-text">Оставьте пустым, если период действует до настоящего времени</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary-custom" onclick="createReportHistory()">Добавить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно редактирования истории отчета -->
+<div class="modal fade" id="editHistoryModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Редактировать период отчета</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editHistoryForm">
+                    <input type="hidden" id="editHistoryId" name="history_id">
+                    <div class="mb-3">
+                        <label class="form-label">Дата начала *</label>
+                        <input type="date" class="form-control" id="editStartDate" name="start_date" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Дата окончания</label>
+                        <input type="date" class="form-control" id="editEndDate" name="end_date">
+                        <div class="form-text">Оставьте пустым, если период действует до настоящего времени</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary-custom" onclick="updateReportHistory()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentClientReportId = null;
+let currentHistoryId = null;
+
+// Создание ЭЦП
+async function createDigitalSignature() {
+    const form = document.getElementById('addSignatureForm');
+    const formData = new FormData(form);
+    
+    try {
+        const submitBtn = document.querySelector('#addSignatureModal .btn-primary-custom');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Добавление...';
+        submitBtn.disabled = true;
+        
+        const response = await fetch(`/client/{{ client.id }}/clients/{{ client_db.id }}/signatures`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addSignatureModal'));
+            modal.hide();
+            form.reset();
+            alert('ЭЦП успешно добавлена');
+            location.reload();
+        } else {
+            alert('Ошибка: ' + (result.detail || 'Неизвестная ошибка'));
+        }
+    } catch (error) {
+        console.error('Ошибка создания ЭЦП:', error);
+        alert('Ошибка создания ЭЦП: ' + error.message);
+    } finally {
+        const submitBtn = document.querySelector('#addSignatureModal .btn-primary-custom');
+        submitBtn.innerHTML = 'Добавить';
+        submitBtn.disabled = false;
+    }
+}
+
+// Добавление отчета клиенту
+async function addReportToClient() {
+    const form = document.getElementById('addReportToClientForm');
+    const formData = new FormData(form);
+    
+    if (!formData.get('report_id')) {
+        alert('Пожалуйста, выберите отчет');
+        return;
+    }
+    
+    try {
+        const submitBtn = document.querySelector('#addReportModal .btn-primary-custom');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Добавление...';
+        submitBtn.disabled = true;
+        
+        const response = await fetch(`/client/{{ client.id }}/clients/{{ client_db.id }}/reports`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addReportModal'));
+            modal.hide();
+            form.reset();
+            alert('Отчет успешно добавлен клиенту');
+            location.reload();
+        } else {
+            alert('Ошибка: ' + (result.detail || 'Неизвестная ошибка'));
+        }
+    } catch (error) {
+        console.error('Ошибка добавления отчета клиенту:', error);
+        alert('Ошибка добавления отчета клиенту: ' + error.message);
+    } finally {
+        const submitBtn = document.querySelector('#addReportModal .btn-primary-custom');
+        submitBtn.innerHTML = 'Добавить';
+        submitBtn.disabled = false;
+    }
+}
+
+// Функция для открытия модального окна добавления истории
+function addReportHistory(clientReportId) {
+    currentClientReportId = clientReportId;
+    document.getElementById('clientReportId').value = clientReportId;
+    const modal = new bootstrap.Modal(document.getElementById('addHistoryModal'));
+    modal.show();
+}
+
+// Функция для открытия модального окна редактирования истории
+function editReportHistory(historyId, startDate, endDate) {
+    currentHistoryId = historyId;
+    document.getElementById('editHistoryId').value = historyId;
+    document.getElementById('editStartDate').value = startDate;
+    document.getElementById('editEndDate').value = endDate;
+    const modal = new bootstrap.Modal(document.getElementById('editHistoryModal'));
+    modal.show();
+}
+
+// Создание истории отчета
+async function createReportHistory() {
+    const form = document.getElementById('addHistoryForm');
+    const formData = new FormData(form);
+    
+    if (!formData.get('start_date')) {
+        alert('Пожалуйста, укажите дату начала');
+        return;
+    }
+    
+    try {
+        const submitBtn = document.querySelector('#addHistoryModal .btn-primary-custom');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Добавление...';
+        submitBtn.disabled = true;
+        
+        const response = await fetch(`/client/{{ client.id }}/clients/{{ client_db.id }}/reports/${currentClientReportId}/history`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addHistoryModal'));
+            modal.hide();
+            form.reset();
+            alert('Период отчета успешно добавлен');
+            location.reload();
+        } else {
+            alert('Ошибка: ' + (result.detail || 'Неизвестная ошибка'));
+        }
+    } catch (error) {
+        console.error('Ошибка добавления периода отчета:', error);
+        alert('Ошибка добавления периода отчета: ' + error.message);
+    } finally {
+        const submitBtn = document.querySelector('#addHistoryModal .btn-primary-custom');
+        submitBtn.innerHTML = 'Добавить';
+        submitBtn.disabled = false;
+    }
+}
+
+// Обновление истории отчета
+async function updateReportHistory() {
+    const form = document.getElementById('editHistoryForm');
+    const formData = new FormData(form);
+    
+    if (!formData.get('start_date')) {
+        alert('Пожалуйста, укажите дату начала');
+        return;
+    }
+    
+    try {
+        const submitBtn = document.querySelector('#editHistoryModal .btn-primary-custom');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Сохранение...';
+        submitBtn.disabled = true;
+        
+        // Здесь должен быть маршрут для обновления истории
+        // Пока используем тот же маршрут, что и для создания
+        const response = await fetch(`/client/{{ client.id }}/clients/{{ client_db.id }}/reports/history/${currentHistoryId}`, {
+            method: 'PUT',
+            body: formData
+        });
+        
+        if (response.ok) {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editHistoryModal'));
+            modal.hide();
+            form.reset();
+            alert('Период отчета успешно обновлен');
+            location.reload();
+        } else {
+            const result = await response.json();
+            alert('Ошибка: ' + (result.detail || 'Неизвестная ошибка'));
+        }
+    } catch (error) {
+        console.error('Ошибка обновления периода отчета:', error);
+        alert('Ошибка обновления периода отчета: ' + error.message);
+    } finally {
+        const submitBtn = document.querySelector('#editHistoryModal .btn-primary-custom');
+        submitBtn.innerHTML = 'Сохранить';
+        submitBtn.disabled = false;
+    }
+}
+
+// Удаление истории отчета
+async function deleteReportHistory(historyId) {
+    if (!confirm('Вы уверены, что хотите удалить этот период?')) return;
+    
+    try {
+        const response = await fetch(`/client/{{ client.id }}/clients/{{ client_db.id }}/reports/history/${historyId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            alert('Период отчета успешно удален');
+            location.reload();
+        } else {
+            const result = await response.json();
+            alert('Ошибка: ' + (result.detail || 'Неизвестная ошибка'));
+        }
+    } catch (error) {
+        console.error('Ошибка удаления периода отчета:', error);
+        alert('Ошибка удаления периода отчета: ' + error.message);
+    }
+}
+
+// Удаление отчета у клиента
+async function removeClientReport(clientReportId) {
+    if (!confirm('Вы уверены, что хотите удалить этот отчет у клиента?')) return;
+    
+    try {
+        const response = await fetch(`/client/{{ client.id }}/clients/{{ client_db.id }}/reports/${clientReportId}`, {
+            method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            alert('Отчет успешно удален у клиента');
+            location.reload();
+        } else {
+            alert('Ошибка: ' + (result.detail || 'Неизвестная ошибка'));
+        }
+    } catch (error) {
+        console.error('Ошибка удаления отчета у клиента:', error);
+        alert('Ошибка удаления отчета у клиента: ' + error.message);
+    }
+}
+
+// Удаление клиента
+async function deleteClient(clientId) {
+    if (!confirm('Вы уверены, что хотите удалить клиента? Все связанные ЭЦП также будут удалены.')) return;
+    
+    try {
+        const response = await fetch(`/client/{{ client.id }}/clients/${clientId}`, {
+            method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            alert('Клиент успешно удален');
+            window.location.href = '/client/{{ client.id }}/clients';
+        } else {
+            alert('Ошибка: ' + (result.detail || 'Неизвестная ошибка'));
+        }
+    } catch (error) {
+        console.error('Ошибка удаления клиента:', error);
+        alert('Ошибка удаления клиента: ' + error.message);
+    }
+}
+
+// Удаление ЭЦП
+async function deleteSignature(signatureId) {
+    if (!confirm('Вы уверены, что хотите удалить ЭЦП?')) return;
+    
+    try {
+        const response = await fetch(`/client/{{ client.id }}/signatures/${signatureId}`, {
+            method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            alert('ЭЦП успешно удалена');
+            location.reload();
+        } else {
+            alert('Ошибка: ' + (result.detail || 'Неизвестная ошибка'));
+        }
+    } catch (error) {
+        console.error('Ошибка удаления ЭЦП:', error);
+        alert('Ошибка удаления ЭЦП: ' + error.message);
+    }
+}
+</script>
+{% endblock %}
